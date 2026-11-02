@@ -392,10 +392,11 @@ def train_all(df, mp, cols_primary, cols_enh, label_map, q=AD_QUANTILE):
         comp.append({"model": name, "search": method, "params": params, "R2": tem["R2"], "MAE": tem["MAE"], "RMSE": tem["RMSE"],       # test-set scores
                      "train_R2": trm["R2"], "train_MAE": trm["MAE"], "train_RMSE": trm["RMSE"],
                      "cv_R2": cv["R2"], "cv_R2_std": cv["R2_std"], "cv_MAE": cv["MAE"], "cv_RMSE": cv["RMSE"]})
-        best_models[name] = best
+        if name == "SVR":
+    best_models[name] = best
         if name == "SVR": svr_search = s
     svr = best_models["SVR"]
-    svr_params = {k.replace("m__", ""): v for k, v in svr_search.best_params_.items()}; svr_params["cache_size"] = 1000
+    svr_params = {k.replace("m__", ""): v for k, v in svr_search.best_params_.items()}; svr_params["cache_size"] = 100
     # ---- NEW (5): permutation importance on held-out folds of the final set ----
     perm = perm_importance(X_tr, y_tr, splits, selected_features, svr_params)
     # ---- NEW (7): original model (all features) vs new model (selected features): grouped-CV and test-set scores ----
@@ -403,7 +404,7 @@ def train_all(df, mp, cols_primary, cols_enh, label_map, q=AD_QUANTILE):
     _search.data = (Xa_tr, y_tr, g_tr)
     with _par():
         so, _ = _search("SVR", SVR(cache_size=100), SVR_GRID_SMALL if big else _specs()["SVR"][1], "grid", gkf)
-    po = {k.replace("m__", ""): v for k, v in so.best_params_.items()}; po["cache_size"] = 1000
+    po = {k.replace("m__", ""): v for k, v in so.best_params_.items()}; po["cache_size"] = 100
     old_cv = _grouped_cv(Xa_tr, y_tr, feats, splits, po); old_te = _holdout(so.best_estimator_, Xa_te, y_te)
     versus = {"original": {"label": "Original model (all features)", "n_features": len(feats), "features": feats, "cv_r2": old_cv["cv_r2"], "cv_rmse": old_cv["cv_rmse"], "test_r2": old_te["R2"], "test_rmse": old_te["RMSE"], "params": {k: v for k, v in po.items() if k != "cache_size"}},
               "selected": {"label": "New model (selected features)", "n_features": len(selected_features), "features": selected_features, "cv_r2": new_cv["cv_r2"], "cv_rmse": new_cv["cv_rmse"], "test_r2": new_te["R2"], "test_rmse": new_te["RMSE"], "params": {k: v for k, v in svr_params.items() if k != "cache_size"}}}
