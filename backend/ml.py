@@ -139,7 +139,7 @@ def pipe(est): return Pipeline([("imp", SimpleImputer(strategy="median")), ("sc"
 def _specs():
     return {
      "MLP": (MLPRegressor(hidden_layer_sizes=(32,), max_iter=300, random_state=42), None, "bayes"),
-     "SVR": (SVR(cache_size=1000), {"m__C": [0.1, 1, 10, 100], "m__gamma": ["scale", 0.01, 0.05, 0.1], "m__epsilon": [0.01, 0.1, 0.3]}, "grid"),
+     "SVR": (SVR(cache_size=100), {"m__C": [0.1, 1, 10, 100], "m__gamma": ["scale", 0.01, 0.05, 0.1], "m__epsilon": [0.01, 0.1, 0.3]}, "grid"),
      "GBR": (GradientBoostingRegressor(random_state=42), {"m__n_estimators": [100], "m__learning_rate": [0.05, 0.1], "m__max_depth": [2, 3]}, "grid"),
      "KNN": (KNeighborsRegressor(), {"m__n_neighbors": [2, 3, 5, 7], "m__weights": ["uniform", "distance"]}, "grid"),
      "RF": (RandomForestRegressor(random_state=42, n_jobs=1), {"m__n_estimators": [100], "m__max_depth": [None, 6], "m__min_samples_leaf": [1]}, "grid"),
