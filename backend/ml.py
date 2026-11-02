@@ -152,7 +152,7 @@ def _specs():
 #  EVERY cross-validation below is grouped by the composition column: all rows of one composition are always
 #  on the same side. Random row-wise splitting is never used.
 # ======================================================================================================
-N_JOBS = max(1, min(8, os.cpu_count() or 1))
+N_JOBS = 1
 N_FOLDS = 5              # grouped CV folds
 TEST_SIZE = 0.40         # 60 : 40 grouped train / test split
 SPLIT_SEED = 42
