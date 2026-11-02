@@ -319,7 +319,7 @@ def select_features(X_tr, y_tr, g_tr, keep, log=print):
     if not dropped: log("[feature selection] no descriptor pair with |r| > 0.95 – nothing dropped as redundant")
     # SVR used INSIDE the elimination: fixed C=10, epsilon=0.1, gamma="scale" (adapts to the number of features) – fast and the same for every candidate.
     # The final SVR is fully re-tuned (grouped grid search) on the selected features afterwards.
-    params = {"C": 10, "epsilon": 0.1, "gamma": "scale", "cache_size": 1000}
+    params = {"C": 10, "epsilon": 0.1, "gamma": "scale", "cache_size": 100}
     # ---- NEW (3) backward elimination, grouped 5-fold CV, RMSE ----
     cur = list(cols1)
     hist = [{"n_features": len(cur), "removed": None, **_grouped_cv(X_tr, y_tr, cur, splits, params), "features": list(cur)}]
@@ -402,7 +402,7 @@ def train_all(df, mp, cols_primary, cols_enh, label_map, q=AD_QUANTILE):
     new_cv = _grouped_cv(X_tr, y_tr, selected_features, splits, svr_params); new_te = _holdout(svr, X_te, y_te)
     _search.data = (Xa_tr, y_tr, g_tr)
     with _par():
-        so, _ = _search("SVR", SVR(cache_size=1000), SVR_GRID_SMALL if big else _specs()["SVR"][1], "grid", gkf)
+        so, _ = _search("SVR", SVR(cache_size=100), SVR_GRID_SMALL if big else _specs()["SVR"][1], "grid", gkf)
     po = {k.replace("m__", ""): v for k, v in so.best_params_.items()}; po["cache_size"] = 1000
     old_cv = _grouped_cv(Xa_tr, y_tr, feats, splits, po); old_te = _holdout(so.best_estimator_, Xa_te, y_te)
     versus = {"original": {"label": "Original model (all features)", "n_features": len(feats), "features": feats, "cv_r2": old_cv["cv_r2"], "cv_rmse": old_cv["cv_rmse"], "test_r2": old_te["R2"], "test_rmse": old_te["RMSE"], "params": {k: v for k, v in po.items() if k != "cache_size"}},
