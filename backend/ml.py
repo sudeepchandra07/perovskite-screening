@@ -230,7 +230,7 @@ def shapley(model, X, bg, T=4, seed=0):
     rng = np.random.default_rng(seed); n, p = X.shape
     pre, est = model[:-1], model[-1]
     Xv = np.asarray(pre.transform(X), dtype=float); Bv = np.asarray(pre.transform(bg), dtype=float)
-    phi = np.zeros((n, p)); rows = max(1, 10000 // (T * (p + 1))))
+    phi = np.zeros((n, p)); rows = max(1, 10000 // (T * (p + 1)))
     for a in range(0, n, rows):
         b = min(n, a + rows); m = b - a
         start = Bv[rng.integers(len(Bv), size=(m, T))]
