@@ -139,7 +139,7 @@ def pipe(est): return Pipeline([("imp", SimpleImputer(strategy="median")), ("sc"
 def _specs():
     return {
      "MLP": (MLPRegressor(hidden_layer_sizes=(32,), max_iter=300, random_state=42), None, "bayes"),
-     "SVR": (SVR(cache_size=100), {"m__C": [0.1, 1, 10, 100], "m__gamma": ["scale", 0.01, 0.05, 0.1], "m__epsilon": [0.01, 0.1, 0.3]}, "grid"),
+     "SVR": (SVR(cache_size=25), {"m__C": [0.1, 1, 10, 100], "m__gamma": ["scale", 0.01, 0.05, 0.1], "m__epsilon": [0.01, 0.1, 0.3]}, "grid"),
      "GBR": (GradientBoostingRegressor(random_state=42), {"m__n_estimators": [100], "m__learning_rate": [0.05, 0.1], "m__max_depth": [2, 3]}, "grid"),
      "KNN": (KNeighborsRegressor(), {"m__n_neighbors": [2, 3, 5, 7], "m__weights": ["uniform", "distance"]}, "grid"),
      "RF": (RandomForestRegressor(random_state=42, n_jobs=1), {"m__n_estimators": [100], "m__max_depth": [None, 6], "m__min_samples_leaf": [1]}, "grid"),
@@ -153,13 +153,13 @@ def _specs():
 #  on the same side. Random row-wise splitting is never used.
 # ======================================================================================================
 N_JOBS = 1
-N_FOLDS = 5              # grouped CV folds
+N_FOLDS = 3              # grouped CV folds
 TEST_SIZE = 0.40         # 60 : 40 grouped train / test split
 SPLIT_SEED = 42
 RED_THRESHOLD = 0.95     # |r| above which two descriptors count as redundant
-PERM_REPEATS = 20        # permutation-importance repeats
-BIG_ROWS = 1500          # above this many TRAINING rows the slow steps use cheaper (still grouped) settings
-ELIM_ROWS = 1200         # max rows used by the backward elimination (whole compositions are sampled)
+PERM_REPEATS = 3         # permutation-importance repeats
+BIG_ROWS = 500          # above this many TRAINING rows the slow steps use cheaper (still grouped) settings
+ELIM_ROWS = 300         # max rows used by the backward elimination (whole compositions are sampled)
 SVR_GRID_SMALL = {"m__C": [1, 10, 100], "m__gamma": ["scale", 0.05], "m__epsilon": [0.1]}
 KEEP_ALWAYS = ["1000t", "invt", "inverset"]   # normalised names of the 1000/T column: never removed
 
@@ -223,14 +223,14 @@ def _cv_eval(best, X, y, cv, groups):
                  "RMSE": float(np.mean(rmse)), "RMSE_std": float(np.std(rmse))}
 
 
-def shapley(model, X, bg, T=8, seed=0):
+def shapley(model, X, bg, T=4, seed=0):
     """Monte-Carlo permutation Shapley values (interventional, background = training rows).
     All coalitions are built and scored in a few large batches (imputer/scaler are element-wise, so substituting
     features in the transformed space gives exactly the same predictions as substituting before the pipeline)."""
     rng = np.random.default_rng(seed); n, p = X.shape
     pre, est = model[:-1], model[-1]
     Xv = np.asarray(pre.transform(X), dtype=float); Bv = np.asarray(pre.transform(bg), dtype=float)
-    phi = np.zeros((n, p)); rows = max(1, 60000 // (T * (p + 1)))
+    phi = np.zeros((n, p)); rows = max(1, 10000 // (T * (p + 1))))
     for a in range(0, n, rows):
         b = min(n, a + rows); m = b - a
         start = Bv[rng.integers(len(Bv), size=(m, T))]
@@ -244,7 +244,7 @@ def shapley(model, X, bg, T=8, seed=0):
 
 
 def global_shap(model, X, label_map):
-    phi, base = shapley(model, X, X, T=8)
+    phi, base = shapley(model, X, X, T=4)
     out = []
     for j, c in enumerate(X.columns):
         v = X[c].values; sd = np.std(v)
@@ -319,7 +319,7 @@ def select_features(X_tr, y_tr, g_tr, keep, log=print):
     if not dropped: log("[feature selection] no descriptor pair with |r| > 0.95 – nothing dropped as redundant")
     # SVR used INSIDE the elimination: fixed C=10, epsilon=0.1, gamma="scale" (adapts to the number of features) – fast and the same for every candidate.
     # The final SVR is fully re-tuned (grouped grid search) on the selected features afterwards.
-    params = {"C": 10, "epsilon": 0.1, "gamma": "scale", "cache_size": 100}
+    params = {"C": 10, "epsilon": 0.1, "gamma": "scale", "cache_size": 25}
     # ---- NEW (3) backward elimination, grouped 5-fold CV, RMSE ----
     cur = list(cols1)
     hist = [{"n_features": len(cur), "removed": None, **_grouped_cv(X_tr, y_tr, cur, splits, params), "features": list(cur)}]
@@ -403,7 +403,7 @@ def train_all(df, mp, cols_primary, cols_enh, label_map, q=AD_QUANTILE):
     new_cv = _grouped_cv(X_tr, y_tr, selected_features, splits, svr_params); new_te = _holdout(svr, X_te, y_te)
     _search.data = (Xa_tr, y_tr, g_tr)
     with _par():
-        so, _ = _search("SVR", SVR(cache_size=100), SVR_GRID_SMALL if big else _specs()["SVR"][1], "grid", gkf)
+        so, _ = _search("SVR", SVR(cache_size=25), SVR_GRID_SMALL if big else _specs()["SVR"][1], "grid", gkf)
     po = {k.replace("m__", ""): v for k, v in so.best_params_.items()}; po["cache_size"] = 100
     old_cv = _grouped_cv(Xa_tr, y_tr, feats, splits, po); old_te = _holdout(so.best_estimator_, Xa_te, y_te)
     versus = {"original": {"label": "Original model (all features)", "n_features": len(feats), "features": feats, "cv_r2": old_cv["cv_r2"], "cv_rmse": old_cv["cv_rmse"], "test_r2": old_te["R2"], "test_rmse": old_te["RMSE"], "params": {k: v for k, v in po.items() if k != "cache_size"}},
@@ -453,7 +453,7 @@ def screen(df, mp, bundle, label_map, ehull_limit=EHULL_LIMIT, orr_limit=ORR_LIM
     pl, cols = bundle["pipeline"], bundle["features"]; X = df[cols]
     pred = pl.predict(X); Xs = pl[:-1].transform(X)
     dist = np.sqrt(np.einsum("ij,jk,ik->i", Xs - bundle["mu"], bundle["VI"], Xs - bundle["mu"])); thr = bundle["threshold"]
-    phi, base = shapley(pl, X, bundle["background"], T=8)
+    phi, base = shapley(pl, X, bundle["background"], T=4)
     eh = df[mp["ehull"]] if mp.get("ehull") and mp["ehull"] in df.columns else None
     rows = []
     for i in range(len(df)):
